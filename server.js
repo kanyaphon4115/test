@@ -692,6 +692,13 @@ app.post("/forgot-password", (req, res) => {
             if (mailErr) {
               console.log("❌ SEND MAIL ERROR:", mailErr);
               return rollbackAndRespondError(500, "ส่งอีเมล OTP ไม่สำเร็จ");
+            if (mailErr) {
+              console.log("❌ SEND MAIL ERROR:", mailErr);
+              return db.query(
+                "UPDATE users SET otp_code=NULL, otp_expire=NULL WHERE email=?",
+                [email],
+                () => res.status(500).send("ส่งอีเมล OTP ไม่สำเร็จ")
+              );
             }
 
             res.send("ส่ง OTP แล้ว");
