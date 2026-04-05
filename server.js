@@ -3,8 +3,13 @@ const mysql = require("mysql2");
 const nodemailer = require("nodemailer"); 
 const transporter = nodemailer.createTransport({ 
 service: "gmail", 
-auth: { user: "kanyaporn4115k@gmail.com", pass: "aohyvqppkwunoydo", 
+auth: { user: "kanyaporn4115k@gmail.com", pass: "cdesqiwukctitcuo", 
 },
+pool: true,
+maxConnections: 5,
+connectionTimeout: 20000,
+greetingTimeout: 20000,
+socketTimeout: 20000,
  });
 const cors = require("cors");
 const bcrypt = require("bcrypt"); // ✅ ใส่ตรงนี้
@@ -16,6 +21,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
+
+const OTP_EXPIRE_MS = 5 * 60 * 1000;
+const normalizeOtp = (value) => String(value ?? "").trim();
+const isOtpExpired = (otpExpire) => {
+  const expireTime = new Date(otpExpire).getTime();
+  return Number.isNaN(expireTime) || expireTime <= Date.now();
+};
 // 🔥 เชื่อม MySQL (แก้ตามของคุณ)
 const db = mysql.createConnection({
   host: "localhost",
@@ -619,6 +631,11 @@ app.post("/forgot-password", (req, res) => {
   const { email } = req.body;
 
   db.query("SELECT * FROM users WHERE email=?", [email], (err, result) => {
+    if (err) {
+      console.log(err);
+      return res.status(500).send("ระบบมีปัญหา กรุณาลองใหม่");
+    }
+
     if (result.length === 0) {
       return res.send("ถ้ามี email นี้ จะส่ง OTP");
     }
@@ -626,21 +643,60 @@ app.post("/forgot-password", (req, res) => {
     const user = result[0];
 
     // กันกดซ้ำ
-    if (user.otp_code && user.otp_expire && new Date(user.otp_expire) > new Date()) {
+    if (user.otp_code && user.otp_expire && !isOtpExpired(user.otp_expire)) {
       console.log("⛔ ใช้ OTP เดิม");
       return res.send("OTP ถูกส่งไปแล้ว");
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expire = new Date(Date.now() + 5 * 60 * 1000);
+    const expire = new Date(Date.now() + OTP_EXPIRE_MS);
 
     console.log("📩 OTP:", otp);
 
     db.query(
       "UPDATE users SET otp_code=?, otp_expire=? WHERE email=?",
       [otp, expire, email],
-      () => {
-        res.send("ส่ง OTP แล้ว");
+      (updateErr) => {
+        if (updateErr) {
+          console.log(updateErr);
+          return res.status(500).send("ระบบมีปัญหา กรุณาลองใหม่");
+        }
+
+        let isFinished = false;
+        const rollbackAndRespondError = (statusCode, message) =>
+          db.query(
+            "UPDATE users SET otp_code=NULL, otp_expire=NULL WHERE email=?",
+            [email],
+            () => res.status(statusCode).send(message)
+          );
+
+        const timeoutId = setTimeout(() => {
+          if (isFinished) return;
+          isFinished = true;
+          rollbackAndRespondError(504, "ส่ง OTP ช้าเกิน 20 วินาที กรุณาลองใหม่");
+        }, 20000);
+
+        transporter.sendMail(
+          {
+            from: "kanyaporn4115k@gmail.com",
+            to: email,
+            subject: "รหัส OTP สำหรับรีเซ็ตรหัสผ่าน",
+            text: `OTP ของคุณคือ ${otp} (หมดอายุใน 5 นาที)`,
+            html: `<p>OTP ของคุณคือ <b>${otp}</b></p><p>รหัสนี้หมดอายุใน 5 นาที</p>`
+          },
+          (mailErr) => {
+            if (isFinished) return;
+            isFinished = true;
+            clearTimeout(timeoutId);
+
+            if (mailErr) {
+              console.log("❌ SEND MAIL ERROR:", mailErr);
+              return rollbackAndRespondError(500, "ส่งอีเมล OTP ไม่สำเร็จ");
+            }
+
+            res.send("ส่ง OTP แล้ว");
+          }
+        );
       }
     );
   });
@@ -649,6 +705,11 @@ app.post("/reset-password", (req, res) => {
   const { email, otp, password } = req.body;
 
   db.query("SELECT * FROM users WHERE email=?", [email], async (err, result) => {
+    if (err) {
+      console.log(err);
+      return res.status(500).send("ระบบมีปัญหา กรุณาลองใหม่");
+    }
+
     if (result.length === 0) {
       return res.send("ไม่พบผู้ใช้");
     }
@@ -659,17 +720,22 @@ app.post("/reset-password", (req, res) => {
       return res.send("OTP หมดอายุ");
     }
 
-    if (new Date(user.otp_expire) < new Date()) {
-      return res.send("OTP หมดอายุ");
+    if (isOtpExpired(user.otp_expire)) {
+      return db.query(
+        "UPDATE users SET otp_code=NULL, otp_expire=NULL WHERE email=?",
+        [email],
+        () => res.send("OTP หมดอายุ")
+      );
     }
 
-    const cleanOtp = String(otp).trim();
+    const cleanOtp = normalizeOtp(otp);
+    const otpInDb = normalizeOtp(user.otp_code);
 
     console.log("OTP user:", cleanOtp);
-    console.log("OTP DB:", user.otp_code);
+    console.log("OTP DB:", otpInDb);
 
     // ✅ เทียบตรง ๆ
-    if (cleanOtp !== user.otp_code) {
+    if (!/^\d{6}$/.test(cleanOtp) || cleanOtp !== otpInDb) {
       return res.send("OTP ไม่ถูกต้อง");
     }
 
