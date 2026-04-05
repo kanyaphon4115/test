@@ -677,33 +677,27 @@ app.post("/forgot-password", (req, res) => {
         }, 20000);
 
         transporter.sendMail(
-          {
-            from: "kanyaporn4115k@gmail.com",
-            to: email,
-            subject: "รหัส OTP สำหรับรีเซ็ตรหัสผ่าน",
-            text: `OTP ของคุณคือ ${otp} (หมดอายุใน 5 นาที)`,
-            html: `<p>OTP ของคุณคือ <b>${otp}</b></p><p>รหัสนี้หมดอายุใน 5 นาที</p>`
-          },
-          (mailErr) => {
-            if (isFinished) return;
-            isFinished = true;
-            clearTimeout(timeoutId);
+  {
+    from: "kanyaporn4115k@gmail.com",
+    to: email,
+    subject: "รหัส OTP สำหรับรีเซ็ตรหัสผ่าน",
+    text: `OTP ของคุณคือ ${otp} (หมดอายุใน 5 นาที)`,
+    html: `<p>OTP ของคุณคือ <b>${otp}</b></p><p>รหัสนี้หมดอายุใน 5 นาที</p>`
+  },
+  (mailErr) => {
+    if (isFinished) return;
+    clearTimeout(timeoutId);
 
-            if (mailErr) {
-              console.log("❌ SEND MAIL ERROR:", mailErr);
-              return rollbackAndRespondError(500, "ส่งอีเมล OTP ไม่สำเร็จ");
-            if (mailErr) {
-              console.log("❌ SEND MAIL ERROR:", mailErr);
-              return db.query(
-                "UPDATE users SET otp_code=NULL, otp_expire=NULL WHERE email=?",
-                [email],
-                () => res.status(500).send("ส่งอีเมล OTP ไม่สำเร็จ")
-              );
-            }
+    if (mailErr) {
+      isFinished = true;
+      console.log("❌ SEND MAIL ERROR:", mailErr);
+      return rollbackAndRespondError(500, "ส่งอีเมล OTP ไม่สำเร็จ");
+    }
 
-            res.send("ส่ง OTP แล้ว");
-          }
-        );
+    isFinished = true;
+    res.send("ส่ง OTP แล้ว");
+  }
+);
       }
     );
   });
