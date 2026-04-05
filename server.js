@@ -5,6 +5,11 @@ const transporter = nodemailer.createTransport({
 service: "gmail", 
 auth: { user: "kanyaporn4115k@gmail.com", pass: "cdesqiwukctitcuo", 
 },
+pool: true,
+maxConnections: 5,
+connectionTimeout: 20000,
+greetingTimeout: 20000,
+socketTimeout: 20000,
  });
 const cors = require("cors");
 const bcrypt = require("bcrypt"); // ✅ ใส่ตรงนี้
@@ -657,6 +662,20 @@ app.post("/forgot-password", (req, res) => {
           return res.status(500).send("ระบบมีปัญหา กรุณาลองใหม่");
         }
 
+        let isFinished = false;
+        const rollbackAndRespondError = (statusCode, message) =>
+          db.query(
+            "UPDATE users SET otp_code=NULL, otp_expire=NULL WHERE email=?",
+            [email],
+            () => res.status(statusCode).send(message)
+          );
+
+        const timeoutId = setTimeout(() => {
+          if (isFinished) return;
+          isFinished = true;
+          rollbackAndRespondError(504, "ส่ง OTP ช้าเกิน 20 วินาที กรุณาลองใหม่");
+        }, 20000);
+
         transporter.sendMail(
           {
             from: "kanyaporn4115k@gmail.com",
@@ -666,6 +685,13 @@ app.post("/forgot-password", (req, res) => {
             html: `<p>OTP ของคุณคือ <b>${otp}</b></p><p>รหัสนี้หมดอายุใน 5 นาที</p>`
           },
           (mailErr) => {
+            if (isFinished) return;
+            isFinished = true;
+            clearTimeout(timeoutId);
+
+            if (mailErr) {
+              console.log("❌ SEND MAIL ERROR:", mailErr);
+              return rollbackAndRespondError(500, "ส่งอีเมล OTP ไม่สำเร็จ");
             if (mailErr) {
               console.log("❌ SEND MAIL ERROR:", mailErr);
               return db.query(
