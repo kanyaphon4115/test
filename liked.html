@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ข่าวถูกใจ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+
+<div id="navbar"></div>
+<script src="navbar.js"></script>
+<div class="max-w-5xl mx-auto p-6">
+  <h2 class="text-2xl font-bold mb-4">ข่าวที่คุณชื่นชอบ ⭐</h2>
+  <div id="list" class="grid grid-cols-1 md:grid-cols-2 gap-5"></div>
+</div>
+
+<script>
+if (!localStorage.getItem("login")) {
+  window.location.href = "login.html";
+}
+
+async function loadLiked() {
+  const userId = localStorage.getItem("userId");
+  const res = await fetch(`http://localhost:3000/liked-news?user_id=${userId}`);
+  if (!res.ok) {
+    alert(await res.text());
+    return;
+  }
+  const data = await res.json();
+  const container = document.getElementById("list");
+  container.innerHTML = data.length ? data.map(n => `
+    <div class="bg-white p-4 rounded-xl shadow">
+      <h3 class="text-lg font-semibold">${n.title}</h3>
+      <p class="text-gray-600 mt-2">${n.content.substring(0, 120)}...</p>
+      <a href="news.html?id=${n.id}" class="text-blue-500 mt-2 inline-block">อ่านต่อ →</a>
+    </div>
+  `).join("") : `<div class="text-gray-500">ยังไม่มีข่าวถูกใจ</div>`;
+}
+
+function logout() {
+  localStorage.removeItem("login");
+  localStorage.removeItem("userId");
+  window.location.href = "login.html";
+}
+
+loadNavbar();
+loadLiked();
+</script>
+
+</body>
+</html>

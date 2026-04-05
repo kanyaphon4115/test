@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Forgot Password</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+
+<div class="bg-white p-8 rounded-2xl shadow-lg w-80">
+  <h2 class="text-2xl font-bold text-center mb-6">ลืมรหัสผ่าน</h2>
+
+  <input id="email" class="w-full p-2 mb-3 border rounded-lg" placeholder="Email" type="email">
+  <button onclick="sendOtp()" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 mb-4">
+    ส่ง OTP
+  </button>
+
+  <p class="text-sm text-center">
+    <a href="login.html" class="text-blue-500">กลับไปล็อกอิน</a>
+  </p>
+</div>
+
+<script>
+async function sendOtp() {
+  const email = document.getElementById("email").value;
+  if (!email) {
+    alert("กรุณากรอกอีเมล");
+    return;
+  }
+
+  const button = document.querySelector("button");
+  button.disabled = true;
+  button.textContent = "กำลังส่ง...";
+
+  const res = await fetch("http://localhost:3000/forgot-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email })
+  });
+
+  const msg = await res.text();
+
+  if (res.ok) {
+    alert(msg + "\n\nหากไม่พบอีเมล กรุณาตรวจสอบโฟลเดอร์สแปม");
+    // ไปหน้า reset password
+    window.location.href = `reset.html?email=${encodeURIComponent(email)}`;
+  } else {
+    alert("เกิดข้อผิดพลาด: " + msg);
+    button.disabled = false;
+    button.textContent = "ส่ง OTP";
+  }
+}
+</script>
+
+</body>
+</html>

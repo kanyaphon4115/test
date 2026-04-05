@@ -1,0 +1,74 @@
+<div class="bg-white shadow-md px-6 py-3 flex justify-between items-center">
+
+  <!-- LOGO -->
+  <h1 class="text-2xl font-bold text-blue-600">📰 My News</h1>
+
+  <!-- MENU -->
+  <div class="flex gap-6 items-center">
+
+    <!-- หน้าแรก -->
+    <a href="index.html" class="menu-link flex items-center gap-1 text-gray-700 hover:text-blue-500 group transition">
+      <svg xmlns="http://www.w3.org/2000/svg"
+           class="w-5 h-5 stroke-current group-hover:text-blue-500"
+           fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M3 10l9-7 9 7v10a1 1 0 01-1 1h-6v-6H10v6H4a1 1 0 01-1-1V10z" />
+      </svg>
+      หน้าแรก
+    </a>
+
+    <!-- โปรไฟล์ -->
+    <a href="profile.html" class="menu-link flex items-center gap-1 text-gray-700 hover:text-blue-500 group transition">
+      <svg xmlns="http://www.w3.org/2000/svg"
+           class="w-5 h-5 stroke-current group-hover:text-blue-500"
+           fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M5.121 17.804A9 9 0 1118.88 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+      โปรไฟล์
+    </a>
+
+    <!-- เขียนข่าว -->
+    <a href="write.html" class="menu-link flex items-center gap-1 text-gray-700 hover:text-blue-500 group transition">
+      <svg xmlns="http://www.w3.org/2000/svg"
+           class="w-5 h-5 stroke-current group-hover:text-blue-500"
+           fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M11 5h2M12 7v10m-7 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+      เขียนข่าว
+    </a>
+
+    <!-- บันทึก -->
+    <a href="saved.html" class="menu-link flex items-center gap-1 text-gray-700 hover:text-blue-500 group transition">
+      <svg xmlns="http://www.w3.org/2000/svg"
+           class="w-5 h-5 stroke-current group-hover:text-blue-500"
+           fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l2.036 6.26h6.584c.969 0 1.371 1.24.588 1.81l-5.326 3.87 
+          2.036 6.26c.3.921-.755 1.688-1.538 1.118L12 18.347l-5.33 3.898c-.783.57-1.838-.197-1.538-1.118l2.036-6.26 
+          -5.326-3.87c-.783-.57-.38-1.81.588-1.81h6.584l2.035-6.26z" />
+      </svg>
+      บันทึก
+    </a>
+
+  </div>
+
+  <!-- USER -->
+  <div class="flex items-center gap-3">
+    <span id="username" class="text-gray-600 text-sm"></span>
+
+    <button onclick="logout()" 
+      class="flex items-center gap-1 bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">
+
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 stroke-current"
+           fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1m0-10V4" />
+      </svg>
+
+      ออกจากระบบ
+    </button>
+  </div>
+</div>
+

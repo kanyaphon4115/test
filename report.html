@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>รายงานข่าว</title>
+  <script src="https://unpkg.com/vue@3"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100">
+
+<div id="app" class="flex items-center justify-center min-h-screen">
+
+  <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
+    <div id="successBox" 
+  class="hidden bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 text-center">
+  รายงานเรียบร้อย 🎉
+</div>
+    <h2 class="text-xl font-bold mb-4 text-center">🚩 รายงานข่าว</h2>
+
+    <label class="block mb-2">เลือกเหตุผล</label>
+    <select v-model="reason" class="w-full border p-2 rounded mb-4">
+      <option disabled value="">-- เลือกเหตุผล --</option>
+      <option>ข่าวปลอม</option>
+      <option>เนื้อหาไม่เหมาะสม</option>
+      <option>สแปม</option>
+      <option>ละเมิดสิทธิ์</option>
+      <option>อื่น ๆ</option>
+    </select>
+
+    <label class="block mb-2">รายละเอียดเพิ่มเติม</label>
+    <textarea v-model="detail" class="w-full border p-2 rounded mb-4" rows="4"></textarea>
+
+    <button @click="submitReport"
+      class="w-full bg-red-500 text-white py-2 rounded hover:bg-red-600">
+      ส่งรายงาน
+    </button>
+
+  </div>
+
+</div>
+
+<script>
+const { createApp } = Vue;
+
+createApp({
+  data() {
+    return {
+      newsId: null,
+      reason: "",
+      detail: ""
+    };
+  },
+
+  mounted() {
+    const urlParams = new URLSearchParams(window.location.search);
+    this.newsId = urlParams.get("id");
+  },
+
+  methods: {
+    async submitReport() {
+      const userId = localStorage.getItem("userId");
+
+      if (!userId) {
+        alert("กรุณา login");
+        return;
+      }
+
+      if (!this.reason) {
+        alert("กรุณาเลือกเหตุผล");
+        return;
+      }
+
+      await fetch("http://localhost:3000/report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          news_id: this.newsId,
+          reason: this.reason + " - " + this.detail
+        })
+      });
+const box = document.getElementById("successBox");
+  box.classList.remove("hidden");
+
+  setTimeout(() => {
+    box.classList.add("hidden");
+    window.location.href = "index.html";
+  }, 1500);
+    }
+  }
+
+}).mount("#app");
+</script>
+
+</body>
+</html>

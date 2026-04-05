@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+
+<div class="bg-white p-8 rounded-2xl shadow-lg w-80">
+  <h2 class="text-2xl font-bold text-center mb-6">Login</h2>
+
+  <input id="email" class="w-full p-2 mb-3 border rounded-lg" placeholder="Email">
+  <input id="password" type="password" class="w-full p-2 mb-2 border rounded-lg" placeholder="Password">
+
+  <div class="text-right mb-4">
+    <a href="forgot.html" class="text-blue-500 text-sm hover:underline">ลืมรหัสผ่าน?</a>
+  </div>
+
+  <button onclick="login()" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">
+    Login
+  </button>
+
+  <p class="text-sm text-center mt-4">
+    ยังไม่มีบัญชี?
+    <a href="register.html" class="text-blue-500">Register</a>
+  </p>
+</div>
+
+<script>
+async function login() {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  const res = await fetch("http://localhost:3000/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password })
+  });
+
+  if (res.ok) {
+    const data = await res.json();
+    localStorage.setItem("login", JSON.stringify({
+      id: data.userId,
+      name: data.name,
+      email: data.email
+    }));
+    localStorage.setItem("userId", data.userId);
+    localStorage.setItem("userName", data.name);
+    localStorage.setItem("userEmail", data.email);
+    alert(data.message);
+    window.location.href = "index.html"; // ล็อคอินสำเร็จแล้วไปหน้า index
+  } else {
+    const err = await res.text();
+    alert(err); // แสดงข้อความผิดพลาด
+  }
+}
+</script>
+
+</body>
+</html>
