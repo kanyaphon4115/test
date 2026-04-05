@@ -3,7 +3,7 @@ const mysql = require("mysql2");
 const nodemailer = require("nodemailer"); 
 const transporter = nodemailer.createTransport({ 
 service: "gmail", 
-auth: { user: "kanyaporn4115k@gmail.com", pass: "aohyvqppkwunoydo", 
+auth: { user: "kanyaporn4115k@gmail.com", pass: "cdesqiwukctitcuo", 
 },
  });
 const cors = require("cors");
@@ -651,8 +651,33 @@ app.post("/forgot-password", (req, res) => {
     db.query(
       "UPDATE users SET otp_code=?, otp_expire=? WHERE email=?",
       [otp, expire, email],
-      () => {
-        res.send("ส่ง OTP แล้ว");
+      (updateErr) => {
+        if (updateErr) {
+          console.log(updateErr);
+          return res.status(500).send("ระบบมีปัญหา กรุณาลองใหม่");
+        }
+
+        transporter.sendMail(
+          {
+            from: "kanyaporn4115k@gmail.com",
+            to: email,
+            subject: "รหัส OTP สำหรับรีเซ็ตรหัสผ่าน",
+            text: `OTP ของคุณคือ ${otp} (หมดอายุใน 5 นาที)`,
+            html: `<p>OTP ของคุณคือ <b>${otp}</b></p><p>รหัสนี้หมดอายุใน 5 นาที</p>`
+          },
+          (mailErr) => {
+            if (mailErr) {
+              console.log("❌ SEND MAIL ERROR:", mailErr);
+              return db.query(
+                "UPDATE users SET otp_code=NULL, otp_expire=NULL WHERE email=?",
+                [email],
+                () => res.status(500).send("ส่งอีเมล OTP ไม่สำเร็จ")
+              );
+            }
+
+            res.send("ส่ง OTP แล้ว");
+          }
+        );
       }
     );
   });
