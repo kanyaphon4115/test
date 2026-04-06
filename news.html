@@ -48,7 +48,7 @@ function renderComments(comments) {
         <p class="font-semibold text-gray-800">${escapeHtml(item.name || "ผู้ใช้งาน")}</p>
         <p class="text-xs text-gray-500">${item.created_at ? new Date(item.created_at).toLocaleString("th-TH") : ""}</p>
       </div>
-      <p class="text-gray-700 whitespace-pre-line break-words">${escapeHtml(item.content)}</p>
+      <p class="text-gray-700 whitespace-pre-line break-words">${escapeHtml(item.comment)}</p>
     </div>
   `).join("");
 }
@@ -61,7 +61,7 @@ function insertEmoji(emoji) {
 }
 
 async function postCommentWithFallback(payload) {
-  const endpoints = ["http://localhost:3000/comments", "http://localhost:3000/comment"];
+  const endpoints = ["http://localhost:3000/comment"];
   let lastResponse = null;
 
   for (const endpoint of endpoints) {
@@ -99,58 +99,53 @@ async function loadComments() {
     commentList.innerHTML = `<p class="text-red-500">โหลดคอมเมนต์ไม่สำเร็จ</p>`;
   }
 }
-
 async function submitComment() {
   const user = JSON.parse(localStorage.getItem("login") || "null");
-  const userId = localStorage.getItem("userId") || user?.id;
+const userId = user?.id || user?.userId;
   const input = document.getElementById("commentInput");
   const sendBtn = document.getElementById("sendCommentBtn");
   const message = document.getElementById("commentMessage");
 
-  if (!input || !sendBtn || !message) return;
-
   const text = input.value.trim();
   const newsId = Number(id);
+
   if (!userId) {
-    message.className = "text-sm text-red-600";
     message.innerText = "กรุณา login ก่อน";
     return;
   }
 
   if (!newsId || !text) {
-    message.className = "text-sm text-red-600";
-    message.innerText = !newsId ? "ไม่พบรหัสโพสต์" : "กรุณาพิมพ์ข้อความคอมเมนต์";
+    message.innerText = "กรอกข้อมูลไม่ครบ";
     return;
   }
 
   sendBtn.disabled = true;
-  sendBtn.classList.add("opacity-60", "cursor-not-allowed");
-  message.className = "text-sm text-gray-600";
-  message.innerText = "กำลังส่งคอมเมนต์...";
+  message.innerText = "กำลังส่ง...";
 
   try {
-    const result = await postCommentWithFallback({ user_id: userId, news_id: newsId, comment: text });
-    if (!result.ok) {
-      message.className = "text-sm text-red-600";
-      message.innerText = "โพสต์คอมเมนต์ไม่สำเร็จ กรุณาลองใหม่";
-      return;
-    }
+    const res = await fetch("http://localhost:3000/comment", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        user_id: userId,
+        news_id: newsId,
+        comment: text
+      })
+    });
+
+    if (!res.ok) throw new Error();
 
     input.value = "";
-    message.className = "text-sm text-green-600";
     message.innerText = "คอมเมนต์สำเร็จ ✅";
 
-    await loadComments();
+    loadComments();
   } catch (err) {
     console.error(err);
-    message.className = "text-sm text-red-600";
-    message.innerText = "คอมเมนต์ไม่สำเร็จ";
+    message.innerText = "โพสต์คอมเมนต์ไม่สำเร็จ ❌";
   } finally {
     sendBtn.disabled = false;
-    sendBtn.classList.remove("opacity-60", "cursor-not-allowed");
   }
 }
-
 async function loadNewsDetail() {
   try {
     const res = await fetch(`http://localhost:3000/news/${id}`);

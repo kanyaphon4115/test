@@ -114,18 +114,6 @@ db.connect((err) => {
       }
     });
 
-    db.query("ALTER TABLE comments ADD COLUMN comment TEXT", (err) => {
-      if (err && err.code !== "ER_DUP_FIELDNAME") {
-        console.log(err);
-      }
-    });
-
-    db.query("UPDATE comments SET content = comment WHERE content IS NULL AND comment IS NOT NULL", (err) => {
-      if (err) {
-        console.log(err);
-      }
-    });
-
   }
 });
 // ทดสอบ API
@@ -323,7 +311,7 @@ app.get("/comments", (req, res) => {
 
   db.query(
     `SELECT comments.id, comments.news_id, comments.user_id,
-            COALESCE(comments.content, comments.comment) AS comment,
+            comments.content AS comment,
             comments.created_at, users.name
      FROM comments
      LEFT JOIN users ON comments.user_id = users.id
@@ -350,7 +338,7 @@ const createComment = (req, res) => {
 
   db.query(
     "INSERT INTO comments (user_id, news_id, content, created_at) VALUES (?, ?, ?, NOW())",
-    [user_id, news_id, text],
+   [user_id, news_id, cleanComment],
     (err, result) => {
       if (err) {
         console.log(err);
@@ -359,7 +347,7 @@ const createComment = (req, res) => {
 
       db.query(
         `SELECT comments.id, comments.news_id, comments.user_id,
-                COALESCE(comments.content, comments.comment) AS comment,
+                comments.content AS comment,
                 comments.created_at, users.name
          FROM comments
          LEFT JOIN users ON comments.user_id = users.id
@@ -380,7 +368,6 @@ const createComment = (req, res) => {
 };
 
 app.post("/comment", createComment);
-app.post("/comments", createComment);
 
 app.post("/update-news", newsUpload.single("image"), (req, res) => {
 const { id, user_id, title, content } = req.body;
