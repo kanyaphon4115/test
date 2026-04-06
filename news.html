@@ -53,6 +53,34 @@ function renderComments(comments) {
   `).join("");
 }
 
+function insertEmoji(emoji) {
+  const input = document.getElementById("commentInput");
+  if (!input) return;
+  input.value = `${input.value}${emoji}`;
+  input.focus();
+}
+
+async function postCommentWithFallback(payload) {
+  const endpoints = ["http://localhost:3000/comments", "http://localhost:3000/comment"];
+  let lastResponse = null;
+
+  for (const endpoint of endpoints) {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const raw = await res.text();
+    lastResponse = { res, raw };
+
+    if (res.ok) return { ok: true, raw };
+    if (!raw.includes("Cannot POST")) return { ok: false, raw };
+  }
+
+  return { ok: false, raw: lastResponse ? lastResponse.raw : "คอมเมนต์ไม่สำเร็จ" };
+}
+
 async function loadComments() {
   const commentList = document.getElementById("commentList");
   if (!commentList) return;
@@ -101,28 +129,16 @@ async function submitComment() {
   message.innerText = "กำลังส่งคอมเมนต์...";
 
   try {
-    const res = await fetch("http://localhost:3000/comment", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: userId, news_id: newsId, comment: text })
-    });
-
-    const responseText = await res.text();
-    if (!res.ok) {
+    const result = await postCommentWithFallback({ user_id: userId, news_id: newsId, comment: text });
+    if (!result.ok) {
       message.className = "text-sm text-red-600";
-      message.innerText = responseText || "คอมเมนต์ไม่สำเร็จ";
+      message.innerText = "โพสต์คอมเมนต์ไม่สำเร็จ กรุณาลองใหม่";
       return;
     }
 
     input.value = "";
     message.className = "text-sm text-green-600";
     message.innerText = "คอมเมนต์สำเร็จ ✅";
-
-    try {
-      JSON.parse(responseText);
-    } catch (_) {
-      // ignore json parse errors; comments will refresh from API
-    }
 
     await loadComments();
   } catch (err) {
@@ -176,6 +192,13 @@ async function loadNewsDetail() {
 
       <div class="mt-8 border-t pt-6">
         <h2 class="text-xl font-bold mb-3">💬 คอมเมนต์</h2>
+        <div class="flex flex-wrap gap-2 mb-2">
+          <button type="button" onclick="insertEmoji('😀')" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">😀</button>
+          <button type="button" onclick="insertEmoji('😍')" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">😍</button>
+          <button type="button" onclick="insertEmoji('🔥')" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">🔥</button>
+          <button type="button" onclick="insertEmoji('🎉')" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">🎉</button>
+          <button type="button" onclick="insertEmoji('👍')" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">👍</button>
+        </div>
         <div class="flex gap-2 mb-2">
           <textarea id="commentInput" rows="3" class="w-full border rounded p-2" placeholder="พิมพ์คอมเมนต์ของคุณ"></textarea>
           <button id="sendCommentBtn" onclick="submitComment()" class="bg-blue-600 text-white px-4 rounded hover:bg-blue-700">ส่ง</button>

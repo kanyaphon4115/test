@@ -340,7 +340,7 @@ app.get("/comments", (req, res) => {
   );
 });
 
-app.post("/comment", (req, res) => {
+const createComment = (req, res) => {
   const { user_id, news_id, comment } = req.body;
   const cleanComment = String(comment ?? "").trim();
 
@@ -377,7 +377,10 @@ app.post("/comment", (req, res) => {
       );
     }
   );
-});
+};
+
+app.post("/comment", createComment);
+app.post("/comments", createComment);
 
 app.post("/update-news", newsUpload.single("image"), (req, res) => {
 const { id, user_id, title, content } = req.body;
