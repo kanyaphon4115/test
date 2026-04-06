@@ -23,6 +23,12 @@ if (!localStorage.getItem("login")) {
 
 const params = new URLSearchParams(window.location.search);
 const id = params.get("id");
+const API_BASES = Array.from(
+  new Set(
+    [window.location.origin, "http://localhost:3000", "http://127.0.0.1:3000"]
+      .filter(base => typeof base === "string" && base.startsWith("http"))
+  )
+);
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -61,7 +67,7 @@ function insertEmoji(emoji) {
 }
 
 async function postCommentWithFallback(payload) {
-  const endpoints = ["http://localhost:3000/comments", "http://localhost:3000/comment"];
+  const endpoints = API_BASES.flatMap((base) => [`${base}/comments`, `${base}/comment`]);
   let lastResponse = null;
 
   for (const endpoint of endpoints) {
@@ -86,10 +92,10 @@ async function loadComments() {
   if (!commentList) return;
 
   try {
-    const endpoints = [
-      `http://localhost:3000/comments?news_id=${id}`,
-      `http://localhost:3000/comment?news_id=${id}`
-    ];
+    const endpoints = API_BASES.flatMap((base) => [
+      `${base}/comments?news_id=${id}`,
+      `${base}/comment?news_id=${id}`
+    ]);
     let loaded = false;
     for (const endpoint of endpoints) {
       const res = await fetch(endpoint);
@@ -164,11 +170,17 @@ async function submitComment() {
 
 async function loadNewsDetail() {
   try {
-    const res = await fetch(`http://localhost:3000/news/${id}`);
     const container = document.getElementById("newsDetail");
+    let news = null;
 
-    if (!res.ok) {
-      container.innerHTML = "<p class='text-red-500'>ไม่พบข่าว</p>";
+    for (const base of API_BASES) {
+      const res = await fetch(`${base}/news/${id}`);
+      if (!res.ok) continue;
+      news = await res.json();
+      break;
+    }
+    if (!news) {
+      container.innerHTML = "<p class='text-red-500'>ไม่พบข่าวหรือเชื่อมต่อเซิร์ฟเวอร์ไม่ได้</p>";
       return;
     }
     const news = await res.json();
@@ -229,14 +241,19 @@ async function loadNewsDetail() {
 
 async function like(id, btn) {
   const user = JSON.parse(localStorage.getItem("login"));
+  let data = null;
 
-  const res = await fetch("http://localhost:3000/like", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ user_id: user.id, news_id: id })
-  });
-
-  const data = await res.json();
+  for (const base of API_BASES) {
+    const res = await fetch(`${base}/like`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ user_id: user.id, news_id: id })
+    });
+    if (!res.ok) continue;
+    data = await res.json();
+    break;
+  }
+  if (!data) return;
 
   const count = btn.querySelector(".like-count");
   count.innerText = data.likes;
@@ -244,12 +261,14 @@ async function like(id, btn) {
 
 async function save(id) {
   const user = JSON.parse(localStorage.getItem("login"));
-
-  await fetch("http://localhost:3000/save", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ user_id: user.id, news_id: id })
-  });
+  for (const base of API_BASES) {
+    const res = await fetch(`${base}/save`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ user_id: user.id, news_id: id })
+    });
+    if (res.ok) break;
+  }
 
   alert("⭐ บันทึกแล้ว");
 }
