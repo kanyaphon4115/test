@@ -183,6 +183,7 @@ async function loadNewsDetail() {
       container.innerHTML = "<p class='text-red-500'>ไม่พบข่าวหรือเชื่อมต่อเซิร์ฟเวอร์ไม่ได้</p>";
       return;
     }
+    const news = await res.json();
 
     container.innerHTML = `
       <img src="${news.image ? 'assets/images/' + news.image : 'https://via.placeholder.com/600'}"
