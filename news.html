@@ -17,48 +17,167 @@
 <script src="navbar.js"></script>
 <script>
 
-// 🔐 เช็ค login
 if (!localStorage.getItem("login")) {
   window.location.href = "login.html";
 }
 
-// 📌 ดึง id จาก URL
 const params = new URLSearchParams(window.location.search);
 const id = params.get("id");
 
-// 🚀 โหลดข่าว
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function renderComments(comments) {
+  const commentList = document.getElementById("commentList");
+  if (!commentList) return;
+
+  if (!comments.length) {
+    commentList.innerHTML = '<p class="text-gray-500">ยังไม่มีคอมเมนต์ เป็นคนแรกที่คอมเมนต์ได้เลย ✨</p>';
+    return;
+  }
+
+  commentList.innerHTML = comments.map((item) => `
+    <div class="rounded-lg border border-gray-200 p-3 bg-gray-50">
+      <div class="flex justify-between items-center mb-1 gap-3">
+        <p class="font-semibold text-gray-800">${escapeHtml(item.name || "ผู้ใช้งาน")}</p>
+        <p class="text-xs text-gray-500">${item.created_at ? new Date(item.created_at).toLocaleString("th-TH") : ""}</p>
+      </div>
+      <p class="text-gray-700 whitespace-pre-line break-words">${escapeHtml(item.comment)}</p>
+    </div>
+  `).join("");
+}
+
+function insertEmoji(emoji) {
+  const input = document.getElementById("commentInput");
+  if (!input) return;
+  input.value = `${input.value}${emoji}`;
+  input.focus();
+}
+
+async function postCommentWithFallback(payload) {
+  const endpoints = ["http://localhost:3000/comments", "http://localhost:3000/comment"];
+  let lastResponse = null;
+
+  for (const endpoint of endpoints) {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const raw = await res.text();
+    lastResponse = { res, raw };
+
+    if (res.ok) return { ok: true, raw };
+    if (!raw.includes("Cannot POST")) return { ok: false, raw };
+  }
+
+  return { ok: false, raw: lastResponse ? lastResponse.raw : "คอมเมนต์ไม่สำเร็จ" };
+}
+
+async function loadComments() {
+  const commentList = document.getElementById("commentList");
+  if (!commentList) return;
+
+  try {
+    const res = await fetch(`http://localhost:3000/comments?news_id=${id}`);
+    if (!res.ok) {
+      commentList.innerHTML = `<p class="text-red-500">โหลดคอมเมนต์ไม่สำเร็จ</p>`;
+      return;
+    }
+
+    const comments = await res.json();
+    renderComments(Array.isArray(comments) ? comments : []);
+  } catch (err) {
+    console.error(err);
+    commentList.innerHTML = `<p class="text-red-500">โหลดคอมเมนต์ไม่สำเร็จ</p>`;
+  }
+}
+
+async function submitComment() {
+  const user = JSON.parse(localStorage.getItem("login") || "null");
+  const userId = localStorage.getItem("userId") || user?.id;
+  const input = document.getElementById("commentInput");
+  const sendBtn = document.getElementById("sendCommentBtn");
+  const message = document.getElementById("commentMessage");
+
+  if (!input || !sendBtn || !message) return;
+
+  const text = input.value.trim();
+  const newsId = Number(id);
+  if (!userId) {
+    message.className = "text-sm text-red-600";
+    message.innerText = "กรุณา login ก่อน";
+    return;
+  }
+
+  if (!newsId || !text) {
+    message.className = "text-sm text-red-600";
+    message.innerText = !newsId ? "ไม่พบรหัสโพสต์" : "กรุณาพิมพ์ข้อความคอมเมนต์";
+    return;
+  }
+
+  sendBtn.disabled = true;
+  sendBtn.classList.add("opacity-60", "cursor-not-allowed");
+  message.className = "text-sm text-gray-600";
+  message.innerText = "กำลังส่งคอมเมนต์...";
+
+  try {
+    const result = await postCommentWithFallback({ user_id: userId, news_id: newsId, comment: text });
+    if (!result.ok) {
+      message.className = "text-sm text-red-600";
+      message.innerText = "โพสต์คอมเมนต์ไม่สำเร็จ กรุณาลองใหม่";
+      return;
+    }
+
+    input.value = "";
+    message.className = "text-sm text-green-600";
+    message.innerText = "คอมเมนต์สำเร็จ ✅";
+
+    await loadComments();
+  } catch (err) {
+    console.error(err);
+    message.className = "text-sm text-red-600";
+    message.innerText = "คอมเมนต์ไม่สำเร็จ";
+  } finally {
+    sendBtn.disabled = false;
+    sendBtn.classList.remove("opacity-60", "cursor-not-allowed");
+  }
+}
+
 async function loadNewsDetail() {
   try {
-    const res = await fetch("http://localhost:3000/news");
-    const result = await res.json();
-    const data = Array.isArray(result) ? result : result.data;
-
-    const news = data.find(n => n.id == id);
-
+    const res = await fetch(`http://localhost:3000/news/${id}`);
     const container = document.getElementById("newsDetail");
 
-    if (!news) {
+    if (!res.ok) {
       container.innerHTML = "<p class='text-red-500'>ไม่พบข่าว</p>";
       return;
     }
+    const news = await res.json();
 
     container.innerHTML = `
       <img src="${news.image ? 'assets/images/' + news.image : 'https://via.placeholder.com/600'}"
            class="w-full h-64 object-cover rounded mb-4">
 
-      <h1 class="text-2xl font-bold mb-2">${news.title}</h1>
+      <h1 class="text-2xl font-bold mb-2">${escapeHtml(news.title)}</h1>
       <p class="text-gray-500 text-sm mb-3 flex gap-4">
-  <span>👤 ${news.name || "ไม่ทราบผู้เขียน"}</span>
-  <span>⏰ ${new Date(news.created_at).toLocaleString("th-TH")}</span>
-</p>
+        <span>👤 ${escapeHtml(news.name || "ไม่ทราบผู้เขียน")}</span>
+        <span>⏰ ${new Date(news.created_at).toLocaleString("th-TH")}</span>
+      </p>
 
       <p class="text-gray-500 mb-4">❤️ ${news.likes || 0} ไลค์</p>
 
-      <p class="text-gray-700 leading-relaxed whitespace-pre-line">
-        ${news.content}
+      <p class="text-gray-700 leading-relaxed whitespace-pre-line break-words">
+        ${escapeHtml(news.content)}
       </p>
 
-      <!-- ปุ่ม -->
       <div class="flex gap-3 mt-6">
         <button onclick="like(${news.id}, this)"
           class="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600 flex items-center gap-1">
@@ -70,13 +189,33 @@ async function loadNewsDetail() {
           ⭐ บันทึก
         </button>
       </div>
+
+      <div class="mt-8 border-t pt-6">
+        <h2 class="text-xl font-bold mb-3">💬 คอมเมนต์</h2>
+        <div class="flex flex-wrap gap-2 mb-2">
+          <button type="button" onclick="insertEmoji('😀')" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">😀</button>
+          <button type="button" onclick="insertEmoji('😍')" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">😍</button>
+          <button type="button" onclick="insertEmoji('🔥')" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">🔥</button>
+          <button type="button" onclick="insertEmoji('🎉')" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">🎉</button>
+          <button type="button" onclick="insertEmoji('👍')" class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">👍</button>
+        </div>
+        <div class="flex gap-2 mb-2">
+          <textarea id="commentInput" rows="3" class="w-full border rounded p-2" placeholder="พิมพ์คอมเมนต์ของคุณ"></textarea>
+          <button id="sendCommentBtn" onclick="submitComment()" class="bg-blue-600 text-white px-4 rounded hover:bg-blue-700">ส่ง</button>
+        </div>
+        <p id="commentMessage" class="text-sm text-gray-500 mb-3"></p>
+        <div id="commentList" class="space-y-3">
+          <p class="text-gray-500">กำลังโหลดคอมเมนต์...</p>
+        </div>
+      </div>
     `;
+
+    await loadComments();
   } catch (err) {
     console.error(err);
   }
 }
 
-// ❤️ Like
 async function like(id, btn) {
   const user = JSON.parse(localStorage.getItem("login"));
 
@@ -92,7 +231,6 @@ async function like(id, btn) {
   count.innerText = data.likes;
 }
 
-// ⭐ Save
 async function save(id) {
   const user = JSON.parse(localStorage.getItem("login"));
 
@@ -105,7 +243,6 @@ async function save(id) {
   alert("⭐ บันทึกแล้ว");
 }
 
-// โหลด
 loadNavbar();
 loadNewsDetail();
 
