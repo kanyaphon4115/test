@@ -5,6 +5,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 flex items-center justify-center h-screen">
+<div id="toast" class="hidden fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl text-white font-semibold shadow-lg z-50"></div>
 
 <div class="bg-white p-8 rounded-2xl shadow-lg w-80">
   <h2 class="text-2xl font-bold text-center mb-6">รีเซ็ตรหัสผ่าน</h2>
@@ -25,14 +26,29 @@
 const urlParams = new URLSearchParams(window.location.search);
 const email = urlParams.get('email');
 
+function showMessage(message, type = "success") {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.className = "fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl font-semibold shadow-lg z-50";
+  toast.classList.add(type === "success" ? "bg-green-500" : "bg-red-500", "text-white");
+
+  setTimeout(() => {
+    toast.classList.add("hidden");
+  }, 2500);
+}
+
 async function resetPassword() {
   const otp = document.getElementById("otp").value;
   const password = document.getElementById("password").value;
+  const button = document.querySelector("button");
 
   if (!otp || !password) {
-    alert("กรุณากรอกข้อมูลให้ครบ");
+    showMessage("กรุณากรอกข้อมูลให้ครบ", "error");
     return;
   }
+
+  button.disabled = true;
+  button.textContent = "กำลังบันทึก...";
 
   const res = await fetch("http://localhost:3000/reset-password", {
     method: "POST",
@@ -41,11 +57,18 @@ async function resetPassword() {
   });
 
   const msg = await res.text();
-  alert(msg);
 
   if (res.ok) {
-    window.location.href = "login.html";
+    showMessage("⭐ บันทึกแล้วเรียบร้อย 🎉");
+    setTimeout(() => {
+      window.location.href = "login.html";
+    }, 1000);
+    return;
   }
+
+  showMessage(msg, "error");
+  button.disabled = false;
+  button.textContent = "รีเซ็ตรหัสผ่าน";
 }
 </script>
 

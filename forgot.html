@@ -5,6 +5,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 flex items-center justify-center h-screen">
+<div id="toast" class="hidden fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl text-white font-semibold shadow-lg z-50"></div>
 
 <div class="bg-white p-8 rounded-2xl shadow-lg w-80">
   <h2 class="text-2xl font-bold text-center mb-6">ลืมรหัสผ่าน</h2>
@@ -20,10 +21,21 @@
 </div>
 
 <script>
+function showMessage(message, type = "success") {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.className = "fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl font-semibold shadow-lg z-50";
+  toast.classList.add(type === "success" ? "bg-green-500" : "bg-red-500", "text-white");
+
+  setTimeout(() => {
+    toast.classList.add("hidden");
+  }, 2500);
+}
+
 async function sendOtp() {
   const email = document.getElementById("email").value;
   if (!email) {
-    alert("กรุณากรอกอีเมล");
+    showMessage("กรุณากรอกอีเมล", "error");
     return;
   }
 
@@ -40,11 +52,12 @@ async function sendOtp() {
   const msg = await res.text();
 
   if (res.ok) {
-    alert(msg + "\n\nหากไม่พบอีเมล กรุณาตรวจสอบโฟลเดอร์สแปม");
-    // ไปหน้า reset password
-    window.location.href = `reset.html?email=${encodeURIComponent(email)}`;
+    showMessage(msg + " (ตรวจสอบ Spam ได้ด้วย)");
+    setTimeout(() => {
+      window.location.href = `reset.html?email=${encodeURIComponent(email)}`;
+    }, 900);
   } else {
-    alert("เกิดข้อผิดพลาด: " + msg);
+    showMessage("เกิดข้อผิดพลาด: " + msg, "error");
     button.disabled = false;
     button.textContent = "ส่ง OTP";
   }
