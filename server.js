@@ -661,8 +661,6 @@ app.post("/forgot-password", (req, res) => {
           console.log(updateErr);
           return res.status(500).send("ระบบมีปัญหา กรุณาลองใหม่");
         }
-
-        let isFinished = false;
         const rollbackAndRespondError = (statusCode, message) =>
           db.query(
             "UPDATE users SET otp_code=NULL, otp_expire=NULL WHERE email=?",
@@ -670,13 +668,7 @@ app.post("/forgot-password", (req, res) => {
             () => res.status(statusCode).send(message)
           );
 
-        const timeoutId = setTimeout(() => {
-          if (isFinished) return;
-          isFinished = true;
-          rollbackAndRespondError(504, "ส่ง OTP ช้าเกิน 20 วินาที กรุณาลองใหม่");
-        }, 20000);
-
-        transporter.sendMail(
+      transporter.sendMail(
   {
     from: "kanyaporn4115k@gmail.com",
     to: email,
@@ -685,16 +677,18 @@ app.post("/forgot-password", (req, res) => {
     html: `<p>OTP ของคุณคือ <b>${otp}</b></p><p>รหัสนี้หมดอายุใน 5 นาที</p>`
   },
   (mailErr) => {
-    if (isFinished) return;
-    clearTimeout(timeoutId);
-
     if (mailErr) {
-      isFinished = true;
       console.log("❌ SEND MAIL ERROR:", mailErr);
-      return rollbackAndRespondError(500, "ส่งอีเมล OTP ไม่สำเร็จ");
+
+      // ❗ ค่อย rollback ตอน error จริงเท่านั้น
+      return db.query(
+        "UPDATE users SET otp_code=NULL, otp_expire=NULL WHERE email=?",
+        [email],
+        () => res.status(500).send("ส่งอีเมล OTP ไม่สำเร็จ")
+      );
     }
 
-    isFinished = true;
+    // ✅ สำเร็จ
     res.send("ส่ง OTP แล้ว");
   }
 );
