@@ -302,7 +302,7 @@ app.get("/news/:id", (req, res) => {
   );
 });
 
-app.get("/comments", (req, res) => {
+const listComments = (req, res) => {
   const newsId = Number(req.query.news_id);
 
   if (!newsId) {
@@ -311,7 +311,7 @@ app.get("/comments", (req, res) => {
 
   db.query(
     `SELECT comments.id, comments.news_id, comments.user_id,
-            comments.content AS comment,
+            comments.content,
             comments.created_at, users.name
      FROM comments
      LEFT JOIN users ON comments.user_id = users.id
@@ -326,11 +326,14 @@ app.get("/comments", (req, res) => {
       res.json(result);
     }
   );
-});
+};
+
+app.get("/comments", listComments);
+app.get("/comment", listComments);
 
 const createComment = (req, res) => {
-  const { user_id, news_id, comment } = req.body;
-  const cleanComment = String(comment ?? "").trim();
+  const { user_id, news_id, content } = req.body;
+  const cleanComment = String(content ?? "").trim();
 
   if (!user_id || !news_id || !cleanComment) {
     return res.status(400).send("ข้อมูลไม่ครบ");
@@ -338,7 +341,7 @@ const createComment = (req, res) => {
 
   db.query(
     "INSERT INTO comments (user_id, news_id, content, created_at) VALUES (?, ?, ?, NOW())",
-   [user_id, news_id, cleanComment],
+    [user_id, news_id, cleanComment],
     (err, result) => {
       if (err) {
         console.log(err);
@@ -347,7 +350,7 @@ const createComment = (req, res) => {
 
       db.query(
         `SELECT comments.id, comments.news_id, comments.user_id,
-                comments.content AS comment,
+                comments.content,
                 comments.created_at, users.name
          FROM comments
          LEFT JOIN users ON comments.user_id = users.id
@@ -358,7 +361,7 @@ const createComment = (req, res) => {
             if (selectErr) {
               console.log(selectErr);
             }
-            return res.status(201).json({ id: result.insertId, user_id, news_id, comment: cleanComment });
+            return res.status(201).json({ id: result.insertId, user_id, news_id, content: cleanComment });
           }
           res.status(201).json(commentResult[0]);
         }
@@ -368,6 +371,7 @@ const createComment = (req, res) => {
 };
 
 app.post("/comment", createComment);
+app.post("/comments", createComment);
 
 app.post("/update-news", newsUpload.single("image"), (req, res) => {
 const { id, user_id, title, content } = req.body;
