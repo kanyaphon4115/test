@@ -104,9 +104,27 @@ db.connect((err) => {
       id INT AUTO_INCREMENT PRIMARY KEY,
       user_id INT NOT NULL,
       news_id INT NOT NULL,
-      comment TEXT NOT NULL,
+      content TEXT NOT NULL,
       created_at DATETIME
     )`, (err) => { if (err) console.log(err); });
+
+    db.query("ALTER TABLE comments ADD COLUMN content TEXT", (err) => {
+      if (err && err.code !== "ER_DUP_FIELDNAME") {
+        console.log(err);
+      }
+    });
+
+    db.query("ALTER TABLE comments ADD COLUMN comment TEXT", (err) => {
+      if (err && err.code !== "ER_DUP_FIELDNAME") {
+        console.log(err);
+      }
+    });
+
+    db.query("UPDATE comments SET content = comment WHERE content IS NULL AND comment IS NOT NULL", (err) => {
+      if (err) {
+        console.log(err);
+      }
+    });
 
   }
 });
@@ -304,7 +322,9 @@ app.get("/comments", (req, res) => {
   }
 
   db.query(
-    `SELECT comments.id, comments.news_id, comments.user_id, comments.comment, comments.created_at, users.name
+    `SELECT comments.id, comments.news_id, comments.user_id,
+            COALESCE(comments.content, comments.comment) AS comment,
+            comments.created_at, users.name
      FROM comments
      LEFT JOIN users ON comments.user_id = users.id
      WHERE comments.news_id = ?
@@ -329,8 +349,8 @@ app.post("/comment", (req, res) => {
   }
 
   db.query(
-    "INSERT INTO comments (user_id, news_id, comment, created_at) VALUES (?, ?, ?, NOW())",
-    [user_id, news_id, cleanComment],
+    "INSERT INTO comments (user_id, news_id, content, comment, created_at) VALUES (?, ?, ?, ?, NOW())",
+    [user_id, news_id, cleanComment, cleanComment],
     (err, result) => {
       if (err) {
         console.log(err);
@@ -338,7 +358,9 @@ app.post("/comment", (req, res) => {
       }
 
       db.query(
-        `SELECT comments.id, comments.news_id, comments.user_id, comments.comment, comments.created_at, users.name
+        `SELECT comments.id, comments.news_id, comments.user_id,
+                COALESCE(comments.content, comments.comment) AS comment,
+                comments.created_at, users.name
          FROM comments
          LEFT JOIN users ON comments.user_id = users.id
          WHERE comments.id = ?`,
@@ -791,30 +813,6 @@ app.post("/forgot-password", (req, res) => {
             res.send("ส่ง OTP แล้ว");
           }
         );
-      transporter.sendMail(
-  {
-    from: "kanyaporn4115k@gmail.com",
-    to: email,
-    subject: "รหัส OTP สำหรับรีเซ็ตรหัสผ่าน",
-    text: `OTP ของคุณคือ ${otp} (หมดอายุใน 5 นาที)`,
-    html: `<p>OTP ของคุณคือ <b>${otp}</b></p><p>รหัสนี้หมดอายุใน 5 นาที</p>`
-  },
-  (mailErr) => {
-    if (mailErr) {
-      console.log("❌ SEND MAIL ERROR:", mailErr);
-
-      // ❗ ค่อย rollback ตอน error จริงเท่านั้น
-      return db.query(
-        "UPDATE users SET otp_code=NULL, otp_expire=NULL WHERE email=?",
-        [email],
-        () => res.status(500).send("ส่งอีเมล OTP ไม่สำเร็จ")
-      );
-    }
-
-    // ✅ สำเร็จ
-    res.send("ส่ง OTP แล้ว");
-  }
-);
       }
     );
   });
