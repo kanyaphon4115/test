@@ -48,7 +48,7 @@ function renderComments(comments) {
         <p class="font-semibold text-gray-800">${escapeHtml(item.name || "ผู้ใช้งาน")}</p>
         <p class="text-xs text-gray-500">${item.created_at ? new Date(item.created_at).toLocaleString("th-TH") : ""}</p>
       </div>
-      <p class="text-gray-700 whitespace-pre-line break-words">${escapeHtml(item.comment)}</p>
+      <p class="text-gray-700 whitespace-pre-line break-words">$${escapeHtml(item.content)}</p>
     </div>
   `).join("");
 }

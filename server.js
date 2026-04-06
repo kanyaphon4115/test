@@ -349,8 +349,8 @@ const createComment = (req, res) => {
   }
 
   db.query(
-    "INSERT INTO comments (user_id, news_id, content, comment, created_at) VALUES (?, ?, ?, ?, NOW())",
-    [user_id, news_id, cleanComment, cleanComment],
+    "INSERT INTO comments (user_id, news_id, content, created_at) VALUES (?, ?, ?, NOW())",
+    [user_id, news_id, text],
     (err, result) => {
       if (err) {
         console.log(err);
