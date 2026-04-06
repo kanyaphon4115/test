@@ -791,6 +791,30 @@ app.post("/forgot-password", (req, res) => {
             res.send("ส่ง OTP แล้ว");
           }
         );
+      transporter.sendMail(
+  {
+    from: "kanyaporn4115k@gmail.com",
+    to: email,
+    subject: "รหัส OTP สำหรับรีเซ็ตรหัสผ่าน",
+    text: `OTP ของคุณคือ ${otp} (หมดอายุใน 5 นาที)`,
+    html: `<p>OTP ของคุณคือ <b>${otp}</b></p><p>รหัสนี้หมดอายุใน 5 นาที</p>`
+  },
+  (mailErr) => {
+    if (mailErr) {
+      console.log("❌ SEND MAIL ERROR:", mailErr);
+
+      // ❗ ค่อย rollback ตอน error จริงเท่านั้น
+      return db.query(
+        "UPDATE users SET otp_code=NULL, otp_expire=NULL WHERE email=?",
+        [email],
+        () => res.status(500).send("ส่งอีเมล OTP ไม่สำเร็จ")
+      );
+    }
+
+    // ✅ สำเร็จ
+    res.send("ส่ง OTP แล้ว");
+  }
+);
       }
     );
   });
