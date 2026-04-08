@@ -1,3 +1,4 @@
+console.log("🔥 NEW SERVER FILE LOADED");
 const express = require("express");
 const mysql = require("mysql2");
 const nodemailer = require("nodemailer"); 
@@ -20,7 +21,6 @@ const path = require("path");
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname));
 
 const OTP_EXPIRE_MS = 5 * 60 * 1000;
 const normalizeOtp = (value) => String(value ?? "").trim();
@@ -118,7 +118,7 @@ db.connect((err) => {
 });
 // ทดสอบ API
 app.get("/", (req, res) => {
-  res.send("API ทำงานแล้ว 🚀");
+  res.redirect("/login.html");
 });
 app.post("/register", async (req, res) => {
   const { name, email, password } = req.body;
@@ -302,10 +302,11 @@ app.get("/news/:id", (req, res) => {
   );
 });
 
-const listComments = (req, res) => {
-  const newsId = Number(req.query.news_id);
+console.log("🔥 BEFORE COMMENTS ROUTE");
+ const listComments = (req, res) => {
+  const newsId = parseInt(req.query.news_id); // 🔥 FIX
 
-  if (!newsId) {
+  if (!newsId || isNaN(newsId)) { // 🔥 FIX เพิ่ม isNaN
     return res.status(400).send("ข้อมูลไม่ครบ");
   }
 
@@ -320,22 +321,27 @@ const listComments = (req, res) => {
     [newsId],
     (err, result) => {
       if (err) {
-        console.log(err);
+        console.log("GET COMMENT ERROR:", err); // 🔥 debug
         return res.status(500).send("ไม่สามารถดึงคอมเมนต์ได้");
       }
+
+      console.log("COMMENTS FOUND:", result.length); // 🔥 debug
+
       res.json(result);
     }
   );
 };
-
 app.get("/comments", listComments);
 app.get("/comment", listComments);
 
 const createComment = (req, res) => {
-  const { user_id, news_id, content } = req.body;
-  const cleanComment = String(content ?? "").trim();
+  const user_id = parseInt(req.body.user_id);   // 🔥 FIX
+  const news_id = parseInt(req.body.news_id);   // 🔥 FIX
+  const cleanComment = String(req.body.content ?? "").trim();
 
-  if (!user_id || !news_id || !cleanComment) {
+  console.log("INSERT DATA:", { user_id, news_id, cleanComment }); // debug
+
+  if (isNaN(user_id) || isNaN(news_id) || !cleanComment) {
     return res.status(400).send("ข้อมูลไม่ครบ");
   }
 
@@ -344,9 +350,11 @@ const createComment = (req, res) => {
     [user_id, news_id, cleanComment],
     (err, result) => {
       if (err) {
-        console.log(err);
+        console.log("INSERT ERROR:", err); // 🔥 debug
         return res.status(500).send("ไม่สามารถคอมเมนต์ได้");
       }
+
+      console.log("INSERT SUCCESS:", result.insertId); // 🔥 debug
 
       db.query(
         `SELECT comments.id, comments.news_id, comments.user_id,
@@ -358,10 +366,12 @@ const createComment = (req, res) => {
         [result.insertId],
         (selectErr, commentResult) => {
           if (selectErr || commentResult.length === 0) {
-            if (selectErr) {
-              console.log(selectErr);
-            }
-            return res.status(201).json({ id: result.insertId, user_id, news_id, content: cleanComment });
+            return res.status(201).json({
+              id: result.insertId,
+              user_id,
+              news_id,
+              content: cleanComment
+            });
           }
           res.status(201).json(commentResult[0]);
         }
@@ -371,6 +381,34 @@ const createComment = (req, res) => {
 };
 
 app.post("/comment", createComment);
+app.put("/comment/:id", (req, res) => {
+  const { content, user_id } = req.body;
+
+  db.query(
+    "SELECT user_id FROM comments WHERE id=?",
+    [req.params.id],
+    (err, result) => {
+      if (err) return res.status(500).send(err);
+
+      if (result.length === 0) {
+        return res.status(404).send("ไม่พบคอมเมนต์");
+      }
+
+      if (result[0].user_id !== Number(user_id)) {
+        return res.status(403).send("ไม่มีสิทธิ์แก้ไข");
+      }
+
+      db.query(
+        "UPDATE comments SET content=? WHERE id=?",
+        [content, req.params.id],
+        (err) => {
+          if (err) return res.status(500).send(err);
+          res.send("แก้ไขสำเร็จ");
+        }
+      );
+    }
+  );
+});
 app.post("/comments", createComment);
 
 app.post("/update-news", newsUpload.single("image"), (req, res) => {
@@ -670,56 +708,33 @@ app.post("/upload-avatar", upload.single("avatar"), (req, res) => {
   const imageUrl = "http://localhost:3000/uploads/" + req.file.filename;
   res.json({ url: imageUrl });
 });
-app.delete("/delete-account", (req, res) => {
+app.delete("/comment/:id", (req, res) => {
   const { user_id } = req.body;
-  if (!user_id) return res.status(400).send("ข้อมูลไม่ครบ");
 
-  db.query("DELETE FROM likes WHERE user_id = ?", [user_id], (err) => {
-    if (err) {
-      console.log(err);
-      return res.status(500).send("ลบบัญชีไม่สำเร็จ");
-    }
+  db.query(
+    "SELECT user_id FROM comments WHERE id=?",
+    [req.params.id],
+    (err, result) => {
+      if (err) return res.status(500).send(err);
 
-    db.query("DELETE FROM saves WHERE user_id = ?", [user_id], (err) => {
-      if (err) {
-        console.log(err);
-        return res.status(500).send("ลบบัญชีไม่สำเร็จ");
+      if (result.length === 0) {
+        return res.status(404).send("ไม่พบคอมเมนต์");
       }
 
-      db.query("DELETE FROM comments WHERE user_id = ?", [user_id], (err) => {
-        if (err) {
-          console.log(err);
-          return res.status(500).send("ลบบัญชีไม่สำเร็จ");
+      if (result[0].user_id !== Number(user_id)) {
+        return res.status(403).send("ไม่มีสิทธิ์ลบ");
+      }
+
+      db.query(
+        "DELETE FROM comments WHERE id=?",
+        [req.params.id],
+        (err) => {
+          if (err) return res.status(500).send(err);
+          res.send("ลบสำเร็จ");
         }
-
-        db.query(
-          "DELETE FROM comments WHERE news_id IN (SELECT id FROM news WHERE user_id = ?)",
-          [user_id],
-          (newsCommentsErr) => {
-            if (newsCommentsErr) {
-              console.log(newsCommentsErr);
-              return res.status(500).send("ลบบัญชีไม่สำเร็จ");
-            }
-
-            db.query("DELETE FROM news WHERE user_id = ?", [user_id], (err) => {
-              if (err) {
-                console.log(err);
-                return res.status(500).send("ลบบัญชีไม่สำเร็จ");
-              }
-
-              db.query("DELETE FROM users WHERE id = ?", [user_id], (err) => {
-                if (err) {
-                  console.log(err);
-                  return res.status(500).send("ลบบัญชีไม่สำเร็จ");
-                }
-                res.send("ลบบัญชีสำเร็จ ✅");
-              });
-            });
-          }
-        );
-      });
-    });
-  });
+      );
+    }
+  );
 });
 // เพิ่มข้อมูล
 app.post("/add", (req, res) => {
@@ -861,6 +876,7 @@ app.post("/reset-password", (req, res) => {
     );
   });
 });
+app.use(express.static(__dirname));
 app.listen(3000, () => {
   console.log("Server รันที่ http://localhost:3000");
 });

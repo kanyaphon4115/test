@@ -16,11 +16,11 @@
 
 <script src="navbar.js"></script>
 <script>
-
 if (!localStorage.getItem("login")) {
   window.location.href = "login.html";
 }
-
+const currentUser = JSON.parse(localStorage.getItem("login") || "null");
+const currentUserId = currentUser?.userId || currentUser?.id || localStorage.getItem("userId");
 const params = new URLSearchParams(window.location.search);
 const id = params.get("id");
 
@@ -35,22 +35,38 @@ function escapeHtml(value) {
 
 function renderComments(comments) {
   const commentList = document.getElementById("commentList");
-  if (!commentList) return;
 
-  if (!comments.length) {
-    commentList.innerHTML = '<p class="text-gray-500">ยังไม่มีคอมเมนต์ เป็นคนแรกที่คอมเมนต์ได้เลย ✨</p>';
-    return;
-  }
+  commentList.innerHTML = comments.map((item) => {
+    const isOwner = item.user_id == currentUserId;
 
-  commentList.innerHTML = comments.map((item) => `
-    <div class="rounded-lg border border-gray-200 p-3 bg-gray-50">
-      <div class="flex justify-between items-center mb-1 gap-3">
-        <p class="font-semibold text-gray-800">${escapeHtml(item.name || "ผู้ใช้งาน")}</p>
-        <p class="text-xs text-gray-500">${item.created_at ? new Date(item.created_at).toLocaleString("th-TH") : ""}</p>
-      </div>
-      <p class="text-gray-700 whitespace-pre-line break-words">${escapeHtml(item.content)}</p>
+    return `
+   <div class="border p-3 rounded mb-2">
+
+  <div class="flex justify-between items-center">
+
+    <!-- ซ้าย: ชื่อ + เวลา -->
+    <div class="flex items-center gap-2">
+      <p class="font-semibold">${item.name || "ผู้ใช้"}</p>
+
+      <span class="text-gray-400 text-sm">
+        ${new Date(item.created_at).toLocaleString("th-TH")}
+      </span>
     </div>
-  `).join("");
+
+    <!-- ขวา: ปุ่ม -->
+    ${isOwner ? `
+      <div class="flex gap-2">
+        <button onclick='editComment(${item.id}, ${JSON.stringify(item.content)})'>✏️</button>
+        <button onclick="deleteComment(${item.id})">🗑</button>
+      </div>
+    ` : ""}
+
+  </div>
+
+  <p class="mt-1">${item.content}</p>
+</div>
+    `;
+  }).join("");
 }
 
 function insertEmoji(emoji) {
@@ -86,17 +102,23 @@ async function loadComments() {
   if (!commentList) return;
 
   try {
-    const endpoints = [
-      `http://localhost:3000/comments?news_id=${id}`,
-      `http://localhost:3000/comment?news_id=${id}`
-    ];
+   const endpoints = [
+  `http://localhost:3000/comment?news_id=${id}`,  // 🔥 สลับมาอันนี้ก่อน
+  `http://localhost:3000/comments?news_id=${id}`
+];
     let loaded = false;
+
     for (const endpoint of endpoints) {
+      console.log("LOAD:", endpoint); // 🔥 debug
+
       const res = await fetch(endpoint);
-      if (!res.ok) {
-        continue;
-      }
+
+      if (!res.ok) continue;
+
       const comments = await res.json();
+
+      console.log("COMMENTS:", comments); // 🔥 debug
+
       renderComments(Array.isArray(comments) ? comments : []);
       loaded = true;
       break;
@@ -105,62 +127,90 @@ async function loadComments() {
     if (!loaded) {
       commentList.innerHTML = `<p class="text-red-500">โหลดคอมเมนต์ไม่สำเร็จ</p>`;
     }
+
   } catch (err) {
-    console.error(err);
+    console.error("LOAD ERROR:", err);
     commentList.innerHTML = `<p class="text-red-500">โหลดคอมเมนต์ไม่สำเร็จ</p>`;
   }
 }
+async function deleteComment(id) {
+  const confirmDelete = confirm("คุณแน่ใจว่าจะลบคอมเมนต์นี้?");
+  if (!confirmDelete) return;
 
+  await fetch(`http://localhost:3000/comment/${id}`, {
+method: "DELETE",   
+ headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_id: Number(currentUserId)
+    })
+  });
+
+  loadComments();
+}
+let editingId = null;
+
+function editComment(id, oldText) {
+  editingId = id;
+
+  document.getElementById("editInput").value = oldText;
+  document.getElementById("editPanel").classList.remove("hidden");
+}
+function closeEdit() {
+  document.getElementById("editPanel").classList.add("hidden");
+}
+
+async function saveEdit() {
+  const newText = document.getElementById("editInput").value;
+
+  await fetch(`http://localhost:3000/comment/${editingId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      content: newText,
+      user_id: Number(currentUserId)
+    })
+  });
+
+  closeEdit();
+  loadComments();
+}
+// 🔥🔥 ใส่ตรงนี้เลย (ใต้ editComment)
 async function submitComment() {
   const user = JSON.parse(localStorage.getItem("login") || "null");
-  const userId = localStorage.getItem("userId") || user?.id;
-  const input = document.getElementById("commentInput");
-  const sendBtn = document.getElementById("sendCommentBtn");
-  const message = document.getElementById("commentMessage");
+  const userId = user?.userId || user?.id || localStorage.getItem("userId");
 
-  if (!input || !sendBtn || !message) return;
+  const input = document.getElementById("commentInput");
+  const message = document.getElementById("commentMessage");
 
   const text = input.value.trim();
   const newsId = Number(id);
+
   if (!userId) {
-    message.className = "text-sm text-red-600";
-    message.innerText = "กรุณา login ก่อน";
+    message.innerText = "❌ กรุณา login ใหม่";
     return;
   }
 
-  if (!newsId || !text) {
-    message.className = "text-sm text-red-600";
-    message.innerText = !newsId ? "ไม่พบรหัสโพสต์" : "กรุณาพิมพ์ข้อความคอมเมนต์";
+  if (!text) {
+    message.innerText = "❌ กรุณาพิมพ์ข้อความ";
     return;
   }
 
-  sendBtn.disabled = true;
-  sendBtn.classList.add("opacity-60", "cursor-not-allowed");
-  message.className = "text-sm text-gray-600";
-  message.innerText = "กำลังส่งคอมเมนต์...";
+  await fetch("http://localhost:3000/comment", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_id: Number(userId),
+      news_id: newsId,
+      content: text
+    })
+  });
 
-  try {
-    const result = await postCommentWithFallback({ user_id: userId, news_id: newsId, content: text });
-    if (!result.ok) {
-      message.className = "text-sm text-red-600";
-      message.innerText = "โพสต์คอมเมนต์ไม่สำเร็จ กรุณาลองใหม่";
-      return;
-    }
+  input.value = "";
+  message.innerText = "✅ สำเร็จ";
 
-    input.value = "";
-    message.className = "text-sm text-green-600";
-    message.innerText = "คอมเมนต์สำเร็จ ✅";
-
-    await loadComments();
-  } catch (err) {
-    console.error(err);
-    message.className = "text-sm text-red-600";
-    message.innerText = "คอมเมนต์ไม่สำเร็จ";
-  } finally {
-    sendBtn.disabled = false;
-    sendBtn.classList.remove("opacity-60", "cursor-not-allowed");
-  }
+  loadComments();
 }
+
 
 async function loadNewsDetail() {
   try {
@@ -172,15 +222,19 @@ async function loadNewsDetail() {
       return;
     }
     const news = await res.json();
+const userRes = await fetch("http://localhost:3000/users");
+const users = await userRes.json();
 
+const user = users.find(u => u.id == news.user_id);
+const authorName = user ? user.name : "ไม่ทราบผู้เขียน";
     container.innerHTML = `
       <img src="${news.image ? 'assets/images/' + news.image : 'https://via.placeholder.com/600'}"
            class="w-full h-64 object-cover rounded mb-4">
 
       <h1 class="text-2xl font-bold mb-2">${escapeHtml(news.title)}</h1>
       <p class="text-gray-500 text-sm mb-3 flex gap-4">
-        <span>👤 ${escapeHtml(news.name || "ไม่ทราบผู้เขียน")}</span>
-        <span>⏰ ${new Date(news.created_at).toLocaleString("th-TH")}</span>
+<span>👤 ${escapeHtml(authorName)}</span>        
+<span>⏰ ${new Date(news.created_at).toLocaleString("th-TH")}</span>
       </p>
 
       <p class="text-gray-500 mb-4">❤️ ${news.likes || 0} ไลค์</p>
@@ -258,6 +312,16 @@ loadNavbar();
 loadNewsDetail();
 
 </script>
+<!-- 🔥 PANEL แก้ไขด้านขวา -->
+<div id="editPanel" class="fixed top-0 right-0 w-1/3 h-full bg-white shadow-lg p-6 hidden z-50">
+  <h2 class="text-xl font-bold mb-4">แก้ไขคอมเมนต์</h2>
 
+  <textarea id="editInput" class="w-full border p-2 rounded mb-4"></textarea>
+
+  <div class="flex gap-2">
+    <button onclick="saveEdit()" class="bg-blue-500 text-white px-4 py-2 rounded">บันทึก</button>
+    <button onclick="closeEdit()" class="bg-gray-400 text-white px-4 py-2 rounded">ยกเลิก</button>
+  </div>
+</div>
 </body>
 </html>
